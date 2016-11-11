@@ -14,7 +14,6 @@ function appdRequestInterceptor($log, $q, $cacheFactory, URL_INTERCEPT_RE) {
     }
   };
 
-
   var correlationHeaders,
     requestKeyCache = $cacheFactory('requestKeyCache');
 
@@ -30,31 +29,9 @@ function appdRequestInterceptor($log, $q, $cacheFactory, URL_INTERCEPT_RE) {
 
   // IMPLEMENTATION
 
-  function _getCorrelationHeaders() {
+  function _exec(plugin, method, args) {
     var dfd = $q.defer();
 
-    console.debug('_getCorrelationHeaders: ');
-    if (angular.isDefined(correlationHeaders)) {
-      dfd.resolve(correlationHeaders);
-    } else {
-      cordova.exec(
-        function(d) {
-          dfd.resolve(d);
-        }, function(err) {
-          dfd.reject(err);
-        },
-        'AppDynamics',
-        'getCorrelationHeaders',
-        []);
-    }
-
-    return dfd.promise;
-  }
-
-  function _beginRequest(config) {
-    var dfd = $q.defer();
-
-    console.log('_beginRequest: ', JSON.stringify(config));
     cordova.exec(
       function(d) {
         dfd.resolve(d);
@@ -62,11 +39,25 @@ function appdRequestInterceptor($log, $q, $cacheFactory, URL_INTERCEPT_RE) {
       function(err) {
         dfd.reject(err);
       },
-      'AppDynamics',
-      'beginHttpRequest',
-      [ config.url ]);
+      plugin,
+      method,
+      args);
 
     return dfd.promise;
+  }
+
+  function _getCorrelationHeaders() {
+    console.debug('_getCorrelationHeaders: ');
+    if (angular.isDefined(correlationHeaders)) {
+      return $q.when(correlationHeaders);
+    } else {
+      return _exec('AppDynamics', 'getCorrelationHeaders', []);
+    }
+  }
+
+  function _beginRequest(config) {
+    console.log('_beginRequest: ', JSON.stringify(config));
+    return _exec('AppDynamics', 'beginHttpRequest', [ config.url ]);
   }
 
   function _endRequest(resp) {
@@ -75,21 +66,13 @@ function appdRequestInterceptor($log, $q, $cacheFactory, URL_INTERCEPT_RE) {
     if (!angular.isDefined(appdRequestKey)) {
       return $q.when(resp);
     } else {
-      var dfd = $q.defer();
       requestKeyCache.remove(resp.config);
-
       console.log('_endRequest: ', appdRequestKey, resp.status, resp.headers());
-      cordova.exec(
-        function(d) {
-          dfd.resolve(resp);
-        },
-        function(err) {
-          dfd.reject(err);
-        },
-        'AppDynamics',
-        'reportDone',
-        [ appdRequestKey, resp.status, resp.headers() ]);
-      return dfd.promise;
+
+      return _exec('AppDynamics', 'reportDone', [ appdRequestKey, resp.status, resp.headers() ])
+        .then(function(d) {
+          return resp;
+        });
     }
   }
 
@@ -100,8 +83,7 @@ function appdRequestInterceptor($log, $q, $cacheFactory, URL_INTERCEPT_RE) {
       console.debug('request: ', config.url);
 
       // retrieve correlation headers
-      return $q
-        .when(_getCorrelationHeaders())
+      return _getCorrelationHeaders()
         .then(function(d) {
           // set headers on request
           console.debug('correlation headers: ', JSON.stringify(d));
