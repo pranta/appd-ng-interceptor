@@ -3,9 +3,10 @@
 
 angular
   .module('app.interceptors', [ ])
+  .constant('URL_INTERCEPT_RE', /^https?:\/\//)
   .factory('appdRequestInterceptor', appdRequestInterceptor);
 
-function appdRequestInterceptor($log, $q, $cacheFactory) {
+function appdRequestInterceptor($log, $q, $cacheFactory, URL_INTERCEPT_RE) {
   // simple mock for browser environment
   var cordova = window.cordova || {
     exec: function(success, error, plugin, method, args) {
@@ -93,7 +94,7 @@ function appdRequestInterceptor($log, $q, $cacheFactory) {
   }
 
   function request(config) {
-    if (!config.url.startsWith('http://')) {
+    if (null === config.url.match(URL_INTERCEPT_RE)) {
       return $q.when(config);
     } else {
       console.debug('request: ', config.url);
