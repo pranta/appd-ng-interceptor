@@ -5,7 +5,7 @@ This interceptor will automatically add AppDynamics request headers obtained fro
 In order to use it, configure the httpProvider to use it as an interceptor. Set up a dependency to the provided `app.interceptors` module and refer to this snippet for the config phase:
 
 ```
-.config(function($stateProvider, $httpProvider, $urlRouterProvider) {
+.config(function($httpProvider) {
 ...
   $httpProvider.interceptors.push('appdRequestInterceptor');
 ...
